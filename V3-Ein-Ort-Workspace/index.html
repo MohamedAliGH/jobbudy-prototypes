@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Job-Kompass · Prototyp V3 — Ein-Ort-Workspace</title>
+<meta name="description" content="Vibe-Coding-Prototyp V3: Dashboard mit Status und nächstem Schritt. Testet, ob das Tool den Wechsel vom eigenen System rechtfertigt." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --paper:#F5F1EC; --paper-2:#EFEAE2;
+  --moss:#3D5247; --moss-soft:#5b7064; --moss-tint:#E7EDE9;
+  --terra:#C9745A; --terra-soft:#e0a994; --terra-tint:#F6E7DF;
+  --ink:#2C2A26; --stone:#88857E; --stone-soft:#a8a49c;
+  --line:rgba(44,42,38,.12); --line-strong:rgba(44,42,38,.2);
+  --shadow-soft:0 2px 10px rgba(44,42,38,.05);
+  --shadow-card:0 16px 44px -18px rgba(44,42,38,.22), 0 2px 8px rgba(44,42,38,.05);
+  --shadow-lift:0 28px 64px -22px rgba(44,42,38,.28);
+  --inner-hi:inset 0 1px 0 rgba(255,255,255,.8);
+  --r-lg:26px; --r-md:18px; --r-sm:13px;
+  --ease:cubic-bezier(.32,.72,0,1);
+  --maxw:1140px;
+}
+*{box-sizing:border-box}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{
+  margin:0; font-family:"Plus Jakarta Sans",system-ui,sans-serif; color:var(--ink); line-height:1.6;
+  background:
+    radial-gradient(900px 500px at 92% -8%, rgba(231,237,233,.7), transparent 60%),
+    var(--bg);
+  background-attachment:fixed; min-height:100dvh;
+}
+h1,h2,h3,h4{margin:0; color:var(--moss); line-height:1.18; letter-spacing:-.01em}
+.serif{font-family:"Source Serif 4",Georgia,serif; letter-spacing:-.005em}
+p{margin:0}
+button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+:focus-visible{outline:3px solid rgba(61,82,71,.5); outline-offset:3px; border-radius:7px}
+
+.app{width:min(var(--maxw),calc(100% - 40px)); margin:0 auto; padding:22px 0 100px; position:relative}
+.topbar{display:flex; align-items:center; justify-content:space-between; gap:20px; padding:6px 2px 0}
+.brand{display:flex; align-items:center; gap:11px; font-weight:800; color:var(--moss); font-size:17px}
+.brand .mark{width:30px; height:30px; border-radius:10px; position:relative; background:linear-gradient(150deg,var(--moss),var(--terra)); box-shadow:var(--shadow-soft),var(--inner-hi); flex:0 0 auto}
+.brand .mark::after{content:""; position:absolute; inset:0; border-radius:10px; background:radial-gradient(circle at 50% 40%, #fff 0 2.5px, transparent 3px)}
+.brand small{display:block; font-weight:500; font-size:11.5px; color:var(--stone); margin-top:1px}
+.topnav{display:flex; gap:6px; align-items:center}
+.topnav button{padding:9px 15px; border-radius:999px; font-weight:700; font-size:13.5px; color:var(--stone); transition:all .35s var(--ease)}
+.topnav button:hover{color:var(--moss)} .topnav button.on{background:var(--moss); color:#fff}
+
+.research{position:fixed; right:16px; bottom:16px; z-index:60; display:flex; flex-direction:column; gap:9px;
+  background:rgba(44,42,38,.95); color:#ece8e1; padding:13px 14px 14px; border-radius:16px;
+  border:1px dashed rgba(255,255,255,.28); box-shadow:var(--shadow-lift); width:230px}
+.research h5{color:#fff; font-size:11px; letter-spacing:.16em; text-transform:uppercase; margin:0 0 2px; font-weight:800}
+.research .hint{font-size:11.5px; color:#b9b4ab; line-height:1.4}
+.research .reset{align-self:flex-start; color:#b9b4ab; font-size:11.5px; font-weight:700; text-decoration:underline; text-underline-offset:2px; padding:2px 0}
+.research .reset:hover{color:#fff}
+.research .toggle{display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12.5px; color:#ece8e1; font-weight:700}
+.switch{width:42px; height:24px; border-radius:999px; background:rgba(255,255,255,.18); position:relative; transition:background .4s var(--ease); flex:0 0 auto}
+.switch::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .4s var(--ease)}
+.switch.on{background:var(--terra)} .switch.on::after{transform:translateX(18px)}
+@media(max-width:560px){ .research{right:10px; bottom:10px; width:200px} }
+
+.screen{display:none; animation:enter .55s var(--ease) both}
+.screen.show{display:block}
+@keyframes enter{from{opacity:0; transform:translateY(16px); filter:blur(5px)} to{opacity:1; transform:none; filter:none}}
+.wrap{margin-top:28px}
+.eyebrow{display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px; background:var(--moss-tint); color:var(--moss); font-size:11px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; margin-bottom:16px}
+.eyebrow .pulse{width:6px; height:6px; border-radius:50%; background:var(--terra)}
+
+.shell{background:rgba(255,255,255,.55); border:1px solid var(--line); border-radius:var(--r-lg); padding:6px; box-shadow:var(--shadow-card)}
+.core{background:var(--surface); border-radius:calc(var(--r-lg) - 6px); box-shadow:var(--inner-hi); padding:30px 32px}
+.lead{font-size:17.5px; line-height:1.62; color:#4a4843; max-width:62ch}
+.muted{color:var(--stone)} .small{font-size:13.5px}
+
+.btn{display:inline-flex; align-items:center; gap:11px; padding:13px 17px 13px 21px; border-radius:999px; font-weight:800; font-size:14.5px; transition:transform .4s var(--ease), box-shadow .4s var(--ease), background .3s var(--ease); will-change:transform}
+.btn:active{transform:scale(.975)}
+.btn .ic{width:28px; height:28px; border-radius:50%; display:grid; place-items:center; transition:transform .45s var(--ease)}
+.btn:hover .ic{transform:translate(3px,-1px)}
+.btn-primary{background:var(--moss); color:#fff; box-shadow:0 14px 30px -12px rgba(61,82,71,.55),var(--inner-hi)}
+.btn-primary .ic{background:rgba(255,255,255,.18)} .btn-primary:hover{background:#33453b}
+.btn-terra{background:var(--terra); color:#fff; box-shadow:0 14px 30px -12px rgba(201,116,90,.55)}
+.btn-terra .ic{background:rgba(255,255,255,.22)} .btn-terra:hover{background:#b9684f}
+.btn-ghost{background:var(--surface); color:var(--moss); border:1px solid var(--line-strong); box-shadow:var(--shadow-soft)}
+.btn-ghost:hover{background:var(--paper)}
+.btn-text{color:var(--stone); font-weight:700; font-size:14px; padding:9px 4px}
+.btn-text:hover{color:var(--moss)}
+
+/* welcome */
+.hero{display:grid; grid-template-columns:1.08fr .92fr; gap:16px; align-items:stretch}
+.hero .core{display:flex; flex-direction:column; justify-content:center; padding:46px 44px}
+.hero h1{font-size:clamp(34px,4.6vw,52px); line-height:1.06; margin-bottom:18px}
+.aside{background:var(--moss); color:#eef2ef; border-radius:calc(var(--r-lg) - 6px); padding:38px; position:relative; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; gap:22px}
+.aside::after{content:""; position:absolute; right:-70px; top:-70px; width:230px; height:230px; border-radius:50%; background:rgba(201,116,90,.25)}
+.aside h3{color:var(--terra-soft); font-size:13px; letter-spacing:.15em; text-transform:uppercase; font-weight:800}
+.aside .quote{font-family:"Source Serif 4",serif; font-size:23px; line-height:1.42; color:#fff; position:relative}
+.aside .who{position:relative; font-size:13.5px; color:rgba(238,242,239,.72); font-weight:500}
+
+/* ===== Dashboard ===== */
+.dash-head{display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:22px; flex-wrap:wrap}
+.dash-head h1{font-size:clamp(26px,3vw,34px)}
+.dash-head .sub{color:var(--stone); font-size:14.5px; margin-top:4px}
+
+.today{background:var(--moss); color:#fff; border-radius:var(--r-lg); padding:24px 26px; margin-bottom:18px; position:relative; overflow:hidden; box-shadow:var(--shadow-card)}
+.today::after{content:""; position:absolute; right:-60px; bottom:-80px; width:220px; height:220px; border-radius:50%; background:rgba(201,116,90,.2)}
+.today h3{color:#fff; font-size:13px; letter-spacing:.12em; text-transform:uppercase; opacity:.78; position:relative}
+.today .row{display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.14); position:relative}
+.today .row:last-child{border-bottom:none}
+.today .rn{width:30px; height:30px; border-radius:9px; background:rgba(255,255,255,.16); display:grid; place-items:center; font-size:15px; flex:0 0 auto}
+.today .rt{font-weight:700; font-size:15px; color:#fff}
+.today .rd{font-size:13px; color:rgba(255,255,255,.72)}
+.today .rgo{margin-left:auto; font-size:13px; font-weight:800; color:var(--terra-soft); white-space:nowrap}
+.today .rgo:hover{color:#fff}
+
+.minibar{display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap}
+.stat{flex:1; min-width:150px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); padding:16px 18px; box-shadow:var(--shadow-soft)}
+.stat .v{font-size:24px; font-weight:800; color:var(--moss)}
+.stat .l{font-size:12.5px; color:var(--stone); margin-top:2px}
+.tenmin-card{flex:1.4; min-width:220px; background:var(--terra-tint); border:1px solid rgba(201,116,90,.3); border-radius:var(--r-md); padding:16px 18px; display:flex; gap:13px; align-items:center}
+.tenmin-card .ic{width:38px; height:38px; border-radius:11px; background:var(--terra); color:#fff; display:grid; place-items:center; font-size:18px; flex:0 0 auto}
+.tenmin-card .t{font-weight:800; color:var(--terra); font-size:14.5px}
+.tenmin-card .d{font-size:12.5px; color:#9a5740}
+
+.col-head{display:flex; align-items:center; gap:10px; margin:8px 0 12px; font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--stone)}
+.col-head .n{background:var(--paper-2); color:var(--moss); border-radius:999px; padding:2px 9px; font-size:12px}
+
+.jobs{display:grid; grid-template-columns:repeat(2,1fr); gap:14px}
+@media(max-width:760px){ .jobs{grid-template-columns:1fr} }
+.jobcard{text-align:left; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md); padding:20px 22px; box-shadow:var(--shadow-soft); transition:all .4s var(--ease); position:relative; display:flex; flex-direction:column; gap:10px}
+.jobcard:hover{transform:translateY(-3px); box-shadow:var(--shadow-card); border-color:var(--line-strong)}
+.jobcard .jt{font-weight:800; color:var(--ink); font-size:16.5px; line-height:1.25}
+.jobcard .jco{font-size:13px; color:var(--stone)}
+.jobcard .jmeta{display:flex; align-items:center; gap:14px; font-size:12.5px; color:var(--stone); flex-wrap:wrap}
+.jobcard .jmeta .fit{color:var(--moss-soft); font-weight:700}
+.jobcard .jnext{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--moss); font-weight:700; padding-top:10px; border-top:1px dashed var(--line); margin-top:auto}
+.jobcard .jnext .a{color:var(--terra)}
+.status{display:inline-flex; align-items:center; gap:7px; padding:5px 11px; border-radius:999px; font-size:12px; font-weight:800; width:max-content}
+.status .d{width:7px; height:7px; border-radius:50%}
+.s-entdeckt{background:var(--paper-2); color:#6b6862} .s-entdeckt .d{background:var(--stone)}
+.s-beobachten{background:var(--terra-tint); color:#9a5740} .s-beobachten .d{background:var(--terra)}
+.s-vorbereitung{background:var(--moss-tint); color:var(--moss)} .s-vorbereitung .d{background:var(--moss-soft)}
+.s-beworben{background:#e3ebe5; color:#33453b} .s-beworben .d{background:var(--moss)}
+.s-wartet{background:var(--terra-tint); color:#9a5740} .s-wartet .d{background:var(--terra)}
+.s-absage{background:var(--paper-2); color:var(--stone-soft)} .s-absage .d{background:var(--stone-soft)}
+.deadline{color:var(--terra); font-weight:700}
+
+/* ===== Job detail workspace ===== */
+.crumb{display:flex; align-items:center; gap:8px; color:var(--stone); font-size:13.5px; font-weight:700; margin-bottom:14px}
+.crumb button{color:var(--stone)} .crumb button:hover{color:var(--moss)}
+.detail{display:grid; grid-template-columns:1.5fr .9fr; gap:16px; align-items:start}
+@media(max-width:860px){ .detail{grid-template-columns:1fr} }
+.dt-main h2{font-size:24px; margin-bottom:3px}
+.dt-co{color:var(--stone); font-size:14.5px; margin-bottom:18px}
+.section{margin-bottom:20px}
+.section h4{font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--stone); margin-bottom:9px}
+.fit-mini{display:grid; gap:8px}
+.fit-mini .r{display:flex; gap:11px; align-items:flex-start; font-size:14px; color:#4a4843; line-height:1.5}
+.fit-mini .r .mk{flex:0 0 auto; width:22px; height:22px; border-radius:7px; display:grid; place-items:center; font-weight:800; font-size:12px; margin-top:1px}
+.fit-mini .r.pro .mk{background:var(--moss-tint); color:var(--moss)}
+.fit-mini .r.chk .mk{background:var(--terra-tint); color:var(--terra)}
+.docs{display:grid; gap:9px}
+.doc{display:flex; align-items:center; gap:11px; padding:12px 14px; border-radius:var(--r-sm); border:1px solid var(--line); background:var(--paper); font-size:14px}
+.doc .di{width:30px; height:30px; border-radius:8px; background:var(--surface); border:1px solid var(--line); display:grid; place-items:center; flex:0 0 auto}
+.doc b{color:var(--ink); font-weight:700} .doc .ds{color:var(--stone); font-size:12.5px; margin-left:auto}
+.notes{width:100%; border:1px solid var(--line-strong); border-radius:var(--r-sm); padding:13px 15px; font-family:inherit; font-size:14px; color:var(--ink); background:var(--surface); resize:vertical; line-height:1.55}
+.notes:focus{outline:none; border-color:var(--moss); box-shadow:0 0 0 3px rgba(61,82,71,.12)}
+
+.dt-side{position:sticky; top:18px; display:grid; gap:14px}
+.side-card{padding:22px 24px}
+.side-card h4{font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--stone); margin-bottom:12px}
+.statuspick{display:grid; gap:7px}
+.spick{display:flex; align-items:center; gap:10px; padding:10px 13px; border-radius:11px; border:1.5px solid var(--line); background:var(--surface); font-size:13.5px; font-weight:700; color:#4a4843; text-align:left; transition:all .3s var(--ease)}
+.spick:hover{border-color:var(--moss-soft)}
+.spick[aria-pressed="true"]{border-color:var(--moss); background:var(--moss-tint); color:var(--moss)}
+.spick .d{width:8px; height:8px; border-radius:50%; flex:0 0 auto; background:var(--stone-soft)}
+.spick[aria-pressed="true"] .d{background:var(--moss)}
+.followup{margin-top:14px; padding:14px 16px; border-radius:var(--r-sm); background:var(--terra-tint); border:1px solid rgba(201,116,90,.3); font-size:13px; color:#8a4f3a; line-height:1.5; opacity:0; max-height:0; overflow:hidden; transition:all .5s var(--ease)}
+.followup.show{opacity:1; max-height:200px; margin-top:14px}
+.followup b{color:var(--terra)}
+.nextbox{background:var(--moss); color:#fff; border-radius:var(--r-md); padding:20px 22px}
+.nextbox .k{font-size:11px; letter-spacing:.12em; text-transform:uppercase; opacity:.75; font-weight:800}
+.nextbox .v{font-weight:800; font-size:16px; margin-top:6px; line-height:1.3}
+.nextbox .btn{margin-top:14px; width:100%; justify-content:center; background:#fff; color:var(--moss)}
+.nextbox .btn .ic{background:var(--moss-tint)}
+
+/* add job */
+.input{width:100%; padding:14px 16px; border-radius:var(--r-sm); border:1.5px solid var(--line-strong); font-family:inherit; font-size:15px; color:var(--ink); background:var(--surface)}
+.input:focus{outline:none; border-color:var(--moss); box-shadow:0 0 0 3px rgba(61,82,71,.12)}
+.capture-steps{display:grid; gap:10px; margin:18px 0 6px}
+.cstep{display:flex; gap:12px; align-items:center; padding:13px 15px; border-radius:var(--r-sm); border:1px solid var(--line); background:var(--paper); font-size:14px; color:#4a4843}
+.cstep .ci{width:26px; height:26px; border-radius:50%; background:var(--moss-tint); color:var(--moss); display:grid; place-items:center; font-weight:800; font-size:13px; flex:0 0 auto}
+.cstep.done .ci{background:var(--moss); color:#fff}
+
+/* reflection (difficult moment) */
+.reflect .core{padding:40px 42px}
+.reflect h2{font-size:24px; margin-bottom:8px}
+.reflect .opt{display:flex; gap:12px; margin-top:16px; flex-wrap:wrap}
+.reflect .opt button{flex:1; min-width:180px; text-align:left; padding:18px 20px; border-radius:var(--r-md); border:1.5px solid var(--line-strong); background:var(--surface); transition:all .35s var(--ease)}
+.reflect .opt button:hover{border-color:var(--moss); transform:translateY(-2px)}
+.reflect .opt .t{font-weight:800; color:var(--moss)} .reflect .opt .d{font-size:13px; color:var(--stone); margin-top:4px}
+
+/* rating */
+.rating{margin:30px auto 0; max-width:560px; padding:26px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-card)}
+.rating .q{font-weight:700; color:var(--moss); font-size:18px; margin-bottom:6px; font-family:"Source Serif 4",serif; text-align:center}
+.rating .qs{text-align:center; color:var(--stone); font-size:13.5px; margin-bottom:16px}
+.scale{display:flex; gap:9px; justify-content:center}
+.scale button{flex:1; max-width:84px; padding:14px 6px; border-radius:13px; background:var(--paper); border:1.5px solid var(--line-strong); font-weight:800; font-size:13px; color:var(--moss); transition:all .35s var(--ease); line-height:1.2}
+.scale button:hover{border-color:var(--moss); transform:translateY(-2px)}
+.scale button.on{background:var(--moss); border-color:var(--moss); color:#fff; box-shadow:var(--shadow-card)}
+.thanks{margin-top:18px; font-size:14px; color:var(--moss); font-weight:700; text-align:center; height:20px; opacity:0; transition:opacity .5s var(--ease)}
+.thanks.show{opacity:1}
+
+.flowbtns{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:24px}
+.spacer{flex:1}
+@media(max-width:880px){ .hero{grid-template-columns:1fr} .core{padding:24px 20px} .hero .core{padding:30px 24px} }
+@media(prefers-reduced-motion:reduce){ *{animation-duration:.001ms!important; transition-duration:.001ms!important} }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><span>Job-Kompass<small>Prototyp V3 · Ein-Ort-Workspace</small></span></div>
+    <nav class="topnav" id="topnav">
+      <button class="on" data-go="s-dash">Übersicht</button>
+      <button data-go="s-add">+ Neue Stelle</button>
+    </nav>
+  </header>
+
+  <!-- 0 WELCOME -->
+  <section class="screen show" id="s-welcome">
+    <div class="wrap hero">
+      <div class="shell"><div class="core">
+        <span class="eyebrow"><span class="pulse"></span>Ein Ort statt Tab-Chaos</span>
+        <h1 class="serif">Alle deine<br>Bewerbungen.<br>An einem Ort.</h1>
+        <p class="lead">Keine zwölf Tabs, keine verstreuten Dateien, keine vergessenen Fristen. Du siehst auf einen Blick: Wo stehe ich, was ist als Nächstes dran — und was kann ruhig warten.</p>
+        <div class="flowbtns">
+          <button class="btn btn-primary" data-go="s-dash">Zur Übersicht <span class="ic" aria-hidden="true">→</span></button>
+        </div>
+      </div></div>
+      <aside class="aside">
+        <div><h3>Worum es hier geht</h3></div>
+        <p class="quote">„Ich behalte den Überblick — ohne ihn im Kopf behalten zu müssen.“</p>
+        <p class="who">— Diese Variante testet: Reicht Status + nächster Schritt, damit du dein bisheriges System aufgibst?</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- 1 DASHBOARD -->
+  <section class="screen" id="s-dash">
+    <div class="wrap">
+      <div class="dash-head">
+        <div><h1 class="serif">Guten Morgen.</h1><div class="sub" id="dashSub">Du hast 5 Stellen im Blick. Drei davon brauchen heute kurz deine Aufmerksamkeit.</div></div>
+        <button class="btn btn-ghost" data-go="s-add">Stelle hinzufügen <span class="ic" aria-hidden="true">+</span></button>
+      </div>
+
+      <div class="today" id="todayBox">
+        <h3>Was ist jetzt wichtig?</h3>
+        <div class="row"><span class="rn" aria-hidden="true">✎</span><div><div class="rt">Anschreiben finalisieren · Sachbearbeitung IT-Koordination</div><div class="rd">Frist in 9 Tagen — der Entwurf steht schon zur Hälfte.</div></div><button class="rgo" data-open="0">Weiter →</button></div>
+        <div class="row"><span class="rn" aria-hidden="true">✉</span><div><div class="rt">Nachfragen · Anwendersupport Uniklinik</div><div class="rd">12 Tage keine Rückmeldung — eine Nachfrage wäre jetzt normal.</div></div><button class="rgo" data-open="1">Weiter →</button></div>
+        <div class="row"><span class="rn" aria-hidden="true">◎</span><div><div class="rt">Passung prüfen · IT-Koordination Stadtverwaltung</div><div class="rd">Neu entdeckt — noch nicht bewertet.</div></div><button class="rgo" data-open="3">Weiter →</button></div>
+      </div>
+
+      <div class="minibar">
+        <div class="stat"><div class="v">5</div><div class="l">Stellen im Workspace</div></div>
+        <div class="stat"><div class="v">2</div><div class="l">Bewerbungen offen</div></div>
+        <div class="tenmin-card">
+          <span class="ic" aria-hidden="true">⏱</span>
+          <div><div class="t">Heute nur 10 Minuten?</div><div class="d">Wir zeigen dir den einen kleinen Schritt, der jetzt am meisten bringt.</div></div>
+        </div>
+      </div>
+
+      <div class="col-head">Aktiv <span class="n" id="cntActive">3</span></div>
+      <div class="jobs" id="jobsActive"></div>
+      <div class="col-head" style="margin-top:24px">Ruht / abgeschlossen <span class="n" id="cntRest">2</span></div>
+      <div class="jobs" id="jobsRest"></div>
+    </div>
+  </section>
+
+  <!-- 2 JOB DETAIL -->
+  <section class="screen" id="s-detail">
+    <div class="wrap">
+      <div class="crumb"><button data-go="s-dash">← Übersicht</button><span>/</span><span id="crumbTitle">Stelle</span></div>
+      <div class="detail">
+        <div class="shell"><div class="core dt-main">
+          <h2 class="serif" id="dtTitle">Sachbearbeitung IT-Koordination</h2>
+          <div class="dt-co" id="dtCo">Hochschulverwaltung Aachen · Aachen-Mitte</div>
+
+          <div class="section">
+            <h4>Passung — Kurzfassung</h4>
+            <div class="fit-mini">
+              <div class="r pro"><span class="mk">✓</span><div>Erfahrung an der Schnittstelle IT/Verwaltung deckt die Kernaufgabe.</div></div>
+              <div class="r pro"><span class="mk">✓</span><div>Teilzeit möglich · Arbeitsweg ~20 Min, in deinem Rahmen.</div></div>
+              <div class="r chk"><span class="mk">?</span><div>Stundenumfang unklar · offenes Büro — vor Bewerbung klären.</div></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h4>Unterlagen</h4>
+            <div class="docs">
+              <div class="doc"><span class="di" aria-hidden="true">📄</span><b>Lebenslauf — IT &amp; Verwaltung</b><span class="ds">zugeordnet</span></div>
+              <div class="doc"><span class="di" aria-hidden="true">✎</span><b>Anschreiben — V1</b><span class="ds">Entwurf · 2 von 4 Sätzen</span></div>
+            </div>
+          </div>
+
+          <div class="section" style="margin-bottom:0">
+            <h4>Notizen</h4>
+            <textarea class="notes" rows="3" placeholder="Was willst du zu dieser Stelle festhalten? (z. B. Ansprechpartnerin, Frage fürs Gespräch …)">Im Gespräch nach genauem Stundenumfang und Büro-Situation fragen.</textarea>
+          </div>
+        </div></div>
+
+        <div class="dt-side">
+          <div class="shell"><div class="core side-card">
+            <h4>Status</h4>
+            <div class="statuspick" id="statusPick" role="group" aria-label="Status wählen">
+              <button class="spick" data-st="entdeckt"><span class="d"></span>Entdeckt</button>
+              <button class="spick" aria-pressed="true" data-st="vorbereitung"><span class="d"></span>In Vorbereitung</button>
+              <button class="spick" data-st="beworben"><span class="d"></span>Beworben</button>
+              <button class="spick" data-st="wartet"><span class="d"></span>Antwort erwartet</button>
+            </div>
+            <div class="followup" id="followup"></div>
+          </div></div>
+
+          <div class="nextbox">
+            <div class="k">Nächster Schritt</div>
+            <div class="v" id="nextV">Anschreiben finalisieren</div>
+            <button class="btn" id="nextBtn">Jetzt weitermachen <span class="ic" aria-hidden="true">→</span></button>
+          </div>
+
+          <div class="shell"><div class="core side-card" style="padding:18px 22px">
+            <p class="small muted" style="line-height:1.5">Frist: <b class="deadline">in 9 Tagen</b> · Quelle: jobs.hochschule-aachen.de · zuletzt aktualisiert heute</p>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 ADD JOB -->
+  <section class="screen" id="s-add">
+    <div class="wrap" style="max-width:680px">
+      <div class="crumb"><button data-go="s-dash">← Übersicht</button><span>/</span><span>Neue Stelle</span></div>
+      <span class="eyebrow">Stelle hinzufügen</span>
+      <h2 class="serif" style="font-size:28px; margin-bottom:8px">Wie viel Aufwand kostet das Speichern?</h2>
+      <p class="lead" style="margin-bottom:20px">Genau das willst du im Test spüren: Link rein, fertig. Kein Formular, kein Pflegeaufwand.</p>
+      <div class="shell"><div class="core">
+        <input class="input" id="urlInput" value="https://jobs.staedteregion-aachen.de/it-koordination" aria-label="Link zur Stellenanzeige">
+        <div class="capture-steps" id="captureSteps" hidden>
+          <div class="cstep" data-c><span class="ci" aria-hidden="true">1</span>Anzeige geladen &amp; gelesen</div>
+          <div class="cstep" data-c><span class="ci" aria-hidden="true">2</span>Rolle, Frist und Rahmen erkannt</div>
+          <div class="cstep" data-c><span class="ci" aria-hidden="true">3</span>Als Karte im Workspace abgelegt</div>
+        </div>
+        <div class="flowbtns">
+          <button class="btn btn-primary" id="captureBtn">Stelle speichern <span class="ic" aria-hidden="true">+</span></button>
+          <span class="small muted">Simuliert · Beispieldaten</span>
+        </div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- 4 REFLECTION (difficult moment: Absage) -->
+  <section class="screen reflect" id="s-reflect">
+    <div class="wrap" style="max-width:620px">
+      <div class="crumb"><button data-go="s-dash">← Übersicht</button><span>/</span><span>Rückmeldung</span></div>
+      <div class="shell"><div class="core">
+        <h2 class="serif">Das ist keine leichte Nachricht.</h2>
+        <p class="lead">Du hast eine Absage für <b id="reflectJob">Assistenz Fachbereich</b> bekommen. Du musst jetzt gar nichts tun. Wenn du magst, leg kurz ab, was du mitnimmst.</p>
+        <div class="opt">
+          <button data-go="s-dash"><div class="t">Archivieren</div><div class="d">Ablegen, ohne Notiz. Nichts geht verloren.</div></button>
+          <button data-go="s-dash"><div class="t">Kurz notieren</div><div class="d">Eine Sache festhalten, die du beim nächsten Mal anders machst.</div></button>
+        </div>
+        <p class="small muted" style="margin-top:18px">Kein „Nicht aufgeben!“. Kein Countdown zur nächsten Bewerbung. Dein Tempo.</p>
+      </div></div>
+
+      <div class="rating">
+        <div class="q">Fühlt sich dieser Workspace nach Entlastung an?</div>
+        <div class="qs">Oder eher nach noch einer Aufgabe, die du pflegen musst? — Die Kernfrage dieser Variante.</div>
+        <div class="scale" id="scale" role="group" aria-label="Bewertung 1 bis 5">
+          <button data-r="1">Noch eine<br>Aufgabe</button><button data-r="2">2</button><button data-r="3">neutral</button><button data-r="4">4</button><button data-r="5">klare<br>Entlastung</button>
+        </div>
+        <p class="thanks" id="thanks">Danke — Entlastung vs. Pflegeaufwand ist genau das, was dieser Test misst.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<aside class="research" aria-label="Teststeuerung">
+  <h5>◇ Teststeuerung</h5>
+  <div class="hint">Prüft Adoption: Status + nächster Schritt.</div>
+  <div class="toggle"><span>Eigene Stellen (leer)</span><button class="switch" id="ownToggle" role="switch" aria-checked="false" aria-label="Eigene-Stellen-Modus"></button></div>
+  <div class="hint" id="ownHint">Aus = Beispieldaten. An = leeres Board für echte Stellen.</div>
+  <button class="reset" id="goReflect" style="color:#e0a994">→ Schwierigen Moment zeigen (Absage)</button>
+  <button class="reset" id="resetAll">↺ Prototyp zurücksetzen</button>
+</aside>
+
+<script>
+(function(){
+  "use strict";
+  var current="s-welcome";
+  function show(id){
+    var el=document.getElementById(id); if(!el) return;
+    document.getElementById(current).classList.remove("show");
+    el.classList.add("show"); current=id;
+    document.querySelectorAll("#topnav button").forEach(function(b){ b.classList.toggle("on", b.dataset.go===id); });
+    window.scrollTo({top:0,behavior:"smooth"});
+    var h=el.querySelector("h1,h2"); if(h){h.setAttribute("tabindex","-1"); h.focus({preventScroll:true});}
+  }
+  document.addEventListener("click",function(e){ var n=e.target.closest("[data-go]"); if(n) show(n.dataset.go); });
+
+  // ---- job data ----
+  var JOBS=[
+    {t:"Sachbearbeitung IT-Koordination",co:"Hochschulverwaltung Aachen · Aachen-Mitte",st:"vorbereitung",stl:"In Vorbereitung",fit:"3 Gründe dafür · 2 zu klären",meta:"Frist in 9 Tagen",next:"Anschreiben finalisieren",group:"active"},
+    {t:"Anwendersupport Uniklinik",co:"Uniklinik RWTH · Aachen",st:"wartet",stl:"Antwort erwartet",fit:"gute Passung",meta:"beworben vor 12 Tagen",next:"Nachfrage vorbereiten",group:"active"},
+    {t:"IT-Koordination Stadtverwaltung",co:"StädteRegion Aachen",st:"entdeckt",stl:"Entdeckt",fit:"noch nicht geprüft",meta:"neu",next:"Passung prüfen",group:"active"},
+    {t:"Verwaltungsfachkraft Teilzeit",co:"Stadt Würselen",st:"beobachten",stl:"Beobachten",fit:"3 Gründe dafür · 1 zu klären",meta:"keine Frist genannt",next:"später entscheiden",group:"rest"},
+    {t:"Assistenz Fachbereich",co:"FH Aachen",st:"absage",stl:"Absage erhalten",fit:"—",meta:"abgeschlossen",next:"reflektieren",group:"rest"}
+  ];
+  function statusChip(st,stl){ return '<span class="status s-'+st+'"><span class="d"></span>'+stl+'</span>'; }
+  function cardHTML(j,idx){
+    return '<button class="jobcard" data-open="'+idx+'">'+
+      statusChip(j.st,j.stl)+
+      '<div class="jt">'+j.t+'</div><div class="jco">'+j.co+'</div>'+
+      '<div class="jmeta"><span class="fit">'+j.fit+'</span><span>·</span><span class="'+(/Frist/.test(j.meta)?'deadline':'')+'">'+j.meta+'</span></div>'+
+      '<div class="jnext">→ <span>'+j.next+'</span></div></button>';
+  }
+  function renderBoard(){
+    var act="",rest="",na=0,nr=0;
+    JOBS.forEach(function(j,i){ if(j.group==="active"){act+=cardHTML(j,i);na++;} else {rest+=cardHTML(j,i);nr++;} });
+    document.getElementById("jobsActive").innerHTML=act;
+    document.getElementById("jobsRest").innerHTML=rest;
+    document.getElementById("cntActive").textContent=na;
+    document.getElementById("cntRest").textContent=nr;
+  }
+  // open detail (or reflection for the Absage card)
+  document.addEventListener("click",function(e){
+    var o=e.target.closest("[data-open]"); if(!o) return;
+    var j=JOBS[+o.dataset.open];
+    if(j && j.st==="absage"){ document.getElementById("reflectJob").textContent=j.t; show("s-reflect"); return; }
+    if(j){
+      document.getElementById("dtTitle").textContent=j.t;
+      document.getElementById("crumbTitle").textContent=j.t;
+      document.getElementById("dtCo").textContent=j.co;
+      document.getElementById("nextV").textContent=j.next;
+      setStatus(j.st,true);
+    }
+    show("s-detail");
+  });
+
+  // ---- status change + gentle follow-up ----
+  var FOLLOW={
+    wartet:"Du wartest seit ein paar Tagen. <b>Eine Nachfrage nach 10–14 Werktagen ist normal und professionell</b> — wenn du magst, bereiten wir einen kurzen, freundlichen Nachfasstext vor.",
+    beworben:"Bewerbung ist raus. <b>Schön — das war ein echter Schritt.</b> Wir erinnern dich, falls länger keine Rückmeldung kommt. Du musst nichts im Kopf behalten.",
+    vorbereitung:"",entdeckt:""
+  };
+  function setStatus(st,silent){
+    document.querySelectorAll("#statusPick .spick").forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.st===st); });
+    var f=document.getElementById("followup");
+    if(FOLLOW[st]){ f.innerHTML=FOLLOW[st]; f.classList.add("show"); }
+    else { f.classList.remove("show"); }
+  }
+  document.querySelectorAll("#statusPick .spick").forEach(function(b){
+    b.addEventListener("click",function(){ setStatus(b.dataset.st); });
+  });
+  document.getElementById("nextBtn").addEventListener("click",function(){
+    this.innerHTML='In dieser Demo angedeutet ✓ <span class="ic" aria-hidden="true">→</span>';
+  });
+
+  // ---- add job (capture animation) ----
+  var capBtn=document.getElementById("captureBtn"), capSteps=document.getElementById("captureSteps");
+  capBtn.addEventListener("click",function(){
+    capSteps.hidden=false;
+    var steps=capSteps.querySelectorAll(".cstep"); var i=0;
+    capBtn.innerHTML='Speichere… <span class="ic" aria-hidden="true">◌</span>';
+    var iv=setInterval(function(){
+      if(i<steps.length){ steps[i].classList.add("done"); i++; }
+      else{ clearInterval(iv);
+        // add to board
+        JOBS.splice(0,0,{t:"IT-Koordination StädteRegion",co:"StädteRegion Aachen",st:"entdeckt",stl:"Entdeckt",fit:"noch nicht geprüft",meta:"gerade gespeichert",next:"Passung prüfen",group:"active"});
+        renderBoard();
+        document.getElementById("dashSub").textContent="Stelle gespeichert. Du hast jetzt "+JOBS.filter(function(j){return j.group==='active';}).length+" aktive Stellen im Blick.";
+        capBtn.innerHTML='Gespeichert ✓ <span class="ic" aria-hidden="true">→</span>';
+        setTimeout(function(){ show("s-dash"); resetAdd(); },650);
+      }
+    },420);
+  });
+  function resetAdd(){ capSteps.hidden=true; capSteps.querySelectorAll(".cstep").forEach(function(s){s.classList.remove("done");}); capBtn.innerHTML='Stelle speichern <span class="ic" aria-hidden="true">+</span>'; }
+
+  // ---- rating ----
+  document.querySelectorAll("#scale button").forEach(function(b){ b.addEventListener("click",function(){
+    document.querySelectorAll("#scale button").forEach(function(x){x.classList.remove("on");});
+    b.classList.add("on"); document.getElementById("thanks").classList.add("show");
+  });});
+  document.getElementById("goReflect").addEventListener("click",function(){ document.getElementById("reflectJob").textContent="Assistenz Fachbereich"; show("s-reflect"); });
+
+  // ---- own (empty) mode ----
+  var ownOn=false, BACKUP=null;
+  function setOwn(on){
+    ownOn=on;
+    document.getElementById("ownToggle").classList.toggle("on",on);
+    document.getElementById("ownToggle").setAttribute("aria-checked",on);
+    document.getElementById("ownHint").textContent = on ? "An: leeres Board — echte Stellen eintragen." : "Aus = Beispieldaten. An = leeres Board für echte Stellen.";
+    if(on){
+      BACKUP=JOBS.slice();
+      JOBS.length=0;
+      JOBS.push({t:"[ Erste Stelle der Testperson ]",co:"[ Arbeitgeber · Ort ]",st:"entdeckt",stl:"Entdeckt",fit:"noch nicht geprüft",meta:"neu",next:"Passung prüfen",group:"active"});
+      document.getElementById("dashSub").textContent="Leeres Board. Trage gemeinsam mit der Testperson ihre echten Stellen ein.";
+      document.getElementById("todayBox").style.display="none";
+    } else if(BACKUP){
+      JOBS.length=0; BACKUP.forEach(function(j){JOBS.push(j);}); BACKUP=null;
+      document.getElementById("dashSub").textContent="Du hast 5 Stellen im Blick. Drei davon brauchen heute kurz deine Aufmerksamkeit.";
+      document.getElementById("todayBox").style.display="";
+    }
+    renderBoard(); show("s-dash");
+  }
+  document.getElementById("ownToggle").addEventListener("click",function(){ setOwn(!ownOn); });
+
+  function resetAll(){
+    if(ownOn) setOwn(false);
+    document.querySelectorAll("#scale button").forEach(function(x){x.classList.remove("on");});
+    document.getElementById("thanks").classList.remove("show");
+    resetAdd(); show("s-welcome");
+  }
+  document.getElementById("resetAll").addEventListener("click",resetAll);
+
+  renderBoard();
+})();
+</script>
+</body>
+</html>
