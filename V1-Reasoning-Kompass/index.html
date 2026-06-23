@@ -63,6 +63,14 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
 .stepper .bar.done{background:var(--teal)}
 @media(max-width:780px){ .stepper .label{display:none} .stepper .bar{width:14px} }
 
+/* flow back-nav — quiet, deliberately secondary to the primary CTA */
+.navback{margin:14px 2px 0}
+.backbtn{display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:9px 16px 9px 13px; border-radius:999px;
+  background:rgba(255,255,255,.7); border:1px solid var(--line-strong); color:var(--muted);
+  font-weight:700; font-size:14px; box-shadow:var(--shadow-soft); transition:color .3s var(--ease), border-color .3s var(--ease), background .3s var(--ease)}
+.backbtn:hover{color:var(--navy); border-color:var(--teal); background:#fff}
+.backbtn span{font-size:17px; line-height:1}
+
 /* research control (clearly NOT product UI) */
 .research{position:fixed; right:16px; bottom:16px; z-index:60; display:flex; flex-direction:column; gap:9px;
   background:rgba(23,42,69,.94); color:#dfe6ef; padding:13px 14px 14px; border-radius:16px;
@@ -148,6 +156,7 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
   font-family:inherit; font-size:15px; color:var(--ink); background:var(--white); resize:vertical; transition:border-color .3s var(--ease)}
 .input:focus{border-color:var(--teal); outline:none; box-shadow:0 0 0 4px rgba(47,143,131,.12)}
 .input::placeholder{color:var(--muted-soft)}
+.paste-lab{display:block; font-weight:800; color:var(--navy); font-size:13.5px; margin:0 0 6px}
 
 /* add-job */
 .tabs{display:flex; gap:6px; background:var(--paper); border:1px solid var(--line); padding:5px; border-radius:14px; width:max-content; margin-bottom:20px}
@@ -218,8 +227,9 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
 .gauge{--p:78; width:188px; height:188px; border-radius:50%; margin:6px auto 0; display:grid; place-items:center; position:relative;
   background:conic-gradient(var(--teal) calc(var(--p)*1%), rgba(23,42,69,.10) 0)}
 .gauge::after{content:""; position:absolute; inset:16px; border-radius:50%; background:var(--white); box-shadow:var(--inner-hi)}
-.gauge .num{position:relative; font-weight:800; font-size:52px; color:var(--navy); letter-spacing:-.05em}
+.gauge .num{position:relative; z-index:1; font-weight:800; font-size:52px; color:var(--navy); letter-spacing:-.05em}
 .gauge .num span{font-size:24px}
+.gauge-cap{margin-top:14px; font-size:13.5px; font-weight:700; color:var(--muted)}
 .score-sub{margin:22px 0 4px; display:grid; gap:12px}
 .sbar{display:grid; grid-template-columns:130px 1fr 40px; align-items:center; gap:12px; font-size:13.5px}
 .sbar .lab{color:var(--navy); font-weight:700; text-align:left}
@@ -295,6 +305,13 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
       <span class="st" data-s="3"><span class="dot">3</span><span class="label">Entscheidung</span></span>
     </nav>
   </header>
+
+  <!-- Flow navigation: one quiet step back (history-aware, floored at the job-description screen) -->
+  <div class="navback" id="backBar" hidden>
+    <button class="backbtn" id="backBtn" type="button" aria-label="Eine Seite zurück">
+      <span aria-hidden="true">←</span> Zurück
+    </button>
+  </div>
 
   <!-- 0 · WELCOME -->
   <section class="screen show" id="s-welcome">
@@ -387,7 +404,10 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
           </div>
         </div>
         <div id="pane-text" hidden>
-          <textarea class="input" id="textInput" rows="7" placeholder="Stellentext hier einfügen…">Sachbearbeitung IT-Koordination (m/w/d) — Hochschulverwaltung Aachen. Voll- oder Teilzeit. Schnittstelle zwischen IT und Verwaltung: Koordination von Anfragen, Dokumentation, Anwenderbetreuung. Dynamisches Team im offenen Büro. Bewerbungsfrist: 9 Tage.</textarea>
+          <label class="paste-lab" for="titleInput">Jobtitel</label>
+          <input class="input" id="titleInput" style="margin-bottom:16px" placeholder="z. B. Sachbearbeitung IT-Koordination (m/w/d)" aria-label="Jobtitel" value="Sachbearbeitung IT-Koordination (m/w/d)">
+          <label class="paste-lab" for="textInput">Stellenbeschreibung</label>
+          <textarea class="input" id="textInput" rows="8" placeholder="Ganze Stellenbeschreibung hier einfügen — Aufgaben, Anforderungen, Arbeitszeit, Ort, Frist …">Hochschulverwaltung Aachen. Voll- oder Teilzeit. Schnittstelle zwischen IT und Verwaltung: Koordination von Anfragen, Dokumentation, Anwenderbetreuung. Dynamisches Team im offenen Büro. Bewerbungsfrist: 9 Tage.</textarea>
         </div>
         <div class="flowbtns" style="margin-top:22px">
           <button class="btn btn-primary" id="analyzeBtn">Stelle analysieren <span class="ic" aria-hidden="true">→</span></button>
@@ -610,19 +630,51 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
   var stageOf = {"s-welcome":0,"s-onboarding":0,"s-add":1,"s-summary":1,"s-fit":2,"s-decision":3,"s-finish":3};
   var current = "s-welcome";
 
-  function show(id){
+  // ---- flow navigation: one step back, floored at the job-description screen ----
+  var navHist = [];                          // screens actually visited (the forward path)
+  var navBackCount = {};                      // invisible per-screen back-usage counter (moderator metric)
+  window.__navBackCount = navBackCount;       //   readable from the console; intentionally NO visible UI
+  var BACK_FROM  = ["s-summary","s-fit","s-decision","s-finish"];        // screens where Back is offered
+  var BACK_FLOOR = ["s-add","s-summary","s-fit","s-decision","s-finish"];// valid targets — never Onboarding/Welcome
+  function floorOk(s){ return BACK_FLOOR.indexOf(s) >= 0; }
+  var backBar = document.getElementById("backBar");
+  function updateBackBar(){
+    backBar.hidden = !(BACK_FROM.indexOf(current) >= 0 && navHist.some(floorOk));
+  }
+
+  function show(id, fromBack){
     var el = document.getElementById(id);
     if(!el) return;
+    if(!fromBack && id !== current){ navHist.push(current); history.pushState({screen:id}, ""); }
     document.getElementById(current).classList.remove("show");
     el.classList.add("show");
     current = id;
     updateStepper(stageOf[id]);
+    updateBackBar();
     if(id === "s-fit") triggerScoreBars();
     window.scrollTo({top:0, behavior:"smooth"});
     // focus first heading for a11y
     var h = el.querySelector("h1,h2");
     if(h){ h.setAttribute("tabindex","-1"); h.focus({preventScroll:true}); }
   }
+
+  // one screen back along the path taken; never past the job-description floor
+  function goBack(){
+    while(navHist.length){
+      var prev = navHist.pop();
+      if(floorOk(prev)){
+        navBackCount[current] = (navBackCount[current] || 0) + 1;
+        show(prev, true);
+        return true;
+      }
+    }
+    return false;
+  }
+  // visible button AND browser/OS Back both resolve here; re-push a buffer so hardware Back
+  // stays inside the flow during a moderated test instead of leaving the page.
+  function navBack(){ goBack(); history.pushState({screen:current}, ""); }
+  document.getElementById("backBtn").addEventListener("click", navBack);
+  window.addEventListener("popstate", navBack);
 
   function updateStepper(stage){
     var bar = document.getElementById("stepper");
@@ -683,6 +735,20 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
       linkErr.hidden = false;
       analyzeHint.textContent = "Sanfter Fehlerfall demonstriert — kein Abbruch.";
       return;
+    }
+    // own-job mode: analyse the pasted advert in-browser (summary + reasons + score),
+    // so the tester sees THEIR job assessed — no manual field entry.
+    if(ownOn){
+      var titleVal = (titleInputEl.value||"").trim();
+      var body = (textInputEl.value||"").trim();
+      var linkVal = onLinkTab ? (urlInputEl.value||"").trim() : "";
+      // analyse from whatever the tester gave us — title, description, or both
+      if(!titleVal && !body && !linkVal){
+        analyzeHint.textContent = onLinkTab ? "Bitte zum Text-Tab wechseln und die Stellenbeschreibung einfügen." : "Bitte zuerst Jobtitel und/oder Beschreibung einfügen.";
+        return;
+      }
+      runOwnAnalysis(body || linkVal, titleVal);
+      analyzeHint.textContent = "Aus deiner Eingabe erstellt.";
     }
     analyzeBtn.innerHTML = 'Analysiere… <span class="ic" aria-hidden="true">◌</span>';
     setTimeout(function(){
@@ -762,7 +828,8 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
     document.querySelectorAll("#scale button").forEach(function(x){ x.classList.remove("on"); });
     document.getElementById("thanks").classList.remove("show");
     setTab("link");
-    show("s-welcome");
+    navHist.length = 0;
+    show("s-welcome", true);
   }
   document.getElementById("resetAll").addEventListener("click", resetAll);
   document.getElementById("restartBtn").addEventListener("click", function(){
@@ -770,54 +837,172 @@ button{font-family:inherit; cursor:pointer; border:none; background:none}
     document.querySelectorAll("#scoreBars .fill").forEach(function(f){ f.style.width = "0%"; });
     document.querySelectorAll("#scale button").forEach(function(x){ x.classList.remove("on"); });
     document.getElementById("thanks").classList.remove("show");
-    show("s-add");
+    navHist.length = 0;
+    show("s-add", true);
   });
 
-  // ---- Eigene-Stelle (leer) mode: blank + editable for moderated tests with a real job ----
-  var ownOn = false, ownText = [], jobBody = null, jobBodyOrig = null;
-  function ownTextField(sel, placeholder){
-    document.querySelectorAll(sel).forEach(function(el){
-      ownText.push({el:el, orig:el.textContent});
-      el.textContent = placeholder;
-      el.setAttribute("contenteditable","true");
-      el.setAttribute("data-own-edit","");
-    });
+  // ---- Eigene-Stelle (leer) mode: paste a REAL advert, analyse it in-browser ----
+  // No backend / no AI: we read the pasted text + the 3 onboarding answers and GENERATE
+  // the summary, the for/against reasons and a fit score. Toggle off restores the example.
+  var ownOn = false;
+  var urlInputEl = document.getElementById("urlInput");
+  var titleInputEl = document.getElementById("titleInput");
+  var textInputEl = document.getElementById("textInput");
+  var urlOrig = urlInputEl.value, titleOrig = titleInputEl.value, textOrig = textInputEl.value;
+
+  // regions whose scripted-example content gets swapped for the analysed job (and restored)
+  var OWN_REGIONS = ["#s-summary .job-head","#s-summary .summary",
+    "#s-fit .panel-job .job-head","#s-fit .job-body","#arm-reasoning .core","#arm-score .core"];
+  var ownSnap = null;
+  function snapshotRegions(){
+    ownSnap = OWN_REGIONS.map(function(sel){ var el=document.querySelector(sel); return {sel:sel, html:el?el.innerHTML:null}; });
   }
+  function restoreRegions(){
+    if(!ownSnap) return;
+    ownSnap.forEach(function(s){ var el=document.querySelector(s.sel); if(el && s.html!=null) el.innerHTML=s.html; });
+    ownSnap = null;
+  }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function kv(k,v,flag){ return '<div class="kv'+(flag?" flag":"")+'"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+'</div></div>'; }
+
+  // read the pasted advert into rough structured fields (German-text heuristics, safe fallbacks)
+  function parseJob(text, titleArg){
+    var t=(text||"").replace(/\r/g,"").trim();
+    var lines=t.split("\n").map(function(l){return l.trim();}).filter(Boolean);
+    var low=t.toLowerCase();
+    function has(re){ return re.test(low); }
+    // title from its OWN field when it's a real title; if empty / multi-line / a long pasted
+    // blob, fall back to the first line so a section header never becomes the title.
+    var title=(titleArg||"").trim();
+    if(!title || /\n/.test(title) || title.length>90){ title = (lines[0]||"Eingefügte Stelle").slice(0,90); }
+    if(title.length>96) title=title.slice(0,94)+"…";
+    var emp="", mBei=t.match(/\bbei\s+([A-ZÄÖÜ][\wÄÖÜäöüß&.\-/ ]{2,44})/);
+    if(mBei) emp=mBei[1].split(/[.,;]/)[0].trim();
+    if(!emp){ var mCo=t.match(/([A-ZÄÖÜ][\wÄÖÜäöüß&.\- ]{2,44}(?:GmbH|AG|SE|KG|mbH|e\.?\s?V\.?|Hochschule|Universität|Verwaltung|Klinik|Stiftung|Institut))/); if(mCo) emp=mCo[1].trim(); }
+    var cities=["Berlin","Hamburg","München","Köln","Frankfurt","Stuttgart","Aachen","Düsseldorf","Dortmund","Essen","Leipzig","Dresden","Bremen","Hannover","Nürnberg","Bonn","Mannheim","Karlsruhe","Münster","Wiesbaden"];
+    var loc=""; for(var i=0;i<cities.length;i++){ if(t.indexOf(cities[i])>=0){ loc=cities[i]; break; } }
+    var remote=has(/remote|home\s?office|homeoffice|hybrid|mobiles arbeiten/);
+    var teil=has(/teilzeit/), voll=has(/vollzeit/);
+    var mH=t.match(/(\d{1,2})\s?(?:h|std|stunden)\b/i), hoursNum=mH?+mH[1]:null;
+    var hoursStr = hoursNum?(hoursNum+" h/Woche") : (teil&&voll?"Voll- oder Teilzeit":teil?"Teilzeit":voll?"Vollzeit":"nicht genannt");
+    var deadline="", mFr=t.match(/(\d{1,3})\s?tag/i), mDate=t.match(/(\d{1,2}\.\d{1,2}\.\d{2,4})/);
+    if(mFr) deadline="in "+mFr[1]+" Tagen"; else if(mDate && has(/frist|bewerb/)) deadline="bis "+mDate[1];
+    else if(has(/frist|bewerbungsschluss|bewerbungsfrist/)) deadline="Frist genannt"; else deadline="keine Frist genannt";
+    var env={ grossraum:has(/großraum|offenes? büro|open[\s-]?space/), schicht:has(/schicht/),
+      wochenende:has(/wochenend/), reisen:has(/reisebereitschaft|viel reisen|dienstreis/), telefon:has(/reiner telefon|callcenter|call[\s-]?center|telefonie/) };
+    return {title:title, emp:emp||"Aus eingefügtem Text", loc:loc||(remote?"Remote / Homeoffice":"Ort nicht genannt"),
+      remote:remote, teil:teil, voll:voll, hoursNum:hoursNum, hoursStr:hoursStr, deadline:deadline, env:env};
+  }
+
+  function readOnboarding(){
+    function single(g){ var el=document.querySelector('[data-single="'+g+'"] .chip[aria-pressed="true"]'); return el?el.textContent.trim():""; }
+    var excl=[]; document.querySelectorAll('[data-multi="exclude"] .chip[aria-pressed="true"]').forEach(function(c){ excl.push(c.textContent.trim()); });
+    var hMax=single("hours"), hNum=(hMax.match(/(\d+)/)||[])[1];
+    return {hoursMax:hMax, hoursMaxNum:hNum?+hNum:null, commute:single("commute"), exclude:excl};
+  }
+
+  var ENV_LABEL={grossraum:"Großraumbüro", schicht:"Schichtarbeit", wochenende:"Wochenenddienst", reisen:"viel Reisen", telefon:"reiner Telefonjob"};
+  function excluded(ob,label){ return ob.exclude.some(function(e){ return label.indexOf(e)>=0 || e.indexOf(label.split(" ")[0])>=0; }); }
+  function envHitAny(job,ob){ return Object.keys(ENV_LABEL).some(function(k){ return job.env[k] && excluded(ob,ENV_LABEL[k]); }); }
+
+  function buildReasons(job,ob){
+    var pro=[], chk=[];
+    if(job.teil && ob.hoursMaxNum && ob.hoursMaxNum<40) pro.push(["Teilzeit ist möglich","Die Anzeige nennt Teilzeit — das passt zu deiner Grenze von "+ob.hoursMax+"."]);
+    if(job.hoursNum && ob.hoursMaxNum && job.hoursNum<=ob.hoursMaxNum) pro.push([job.hoursNum+" h/Woche liegt in deinem Rahmen","Der genannte Umfang passt zu deiner Grenze von "+ob.hoursMax+"."]);
+    if(job.remote && ob.commute) pro.push(["Remote / Homeoffice möglich","Der Arbeitsweg fällt teils weg — deine Pendelgrenze ("+ob.commute+") wird damit unkritisch."]);
+    pro.push(["Deine Erfahrung trifft die Rolle","„"+job.title+"“ liegt in deinem Feld — die Kernaufgabe deckst du ab."]);
+    if(/oder teilzeit|nicht genannt/i.test(job.hoursStr)) chk.push(["Genauer Stundenumfang unklar","„"+job.hoursStr+"“ ist vage. Eine kurze Nachfrage lohnt sich, bevor du Energie investierst."]);
+    else if(job.voll && !job.teil && ob.hoursMaxNum && ob.hoursMaxNum<40) chk.push(["Als Vollzeit ausgeschrieben","Du möchtest höchstens "+ob.hoursMax+". Frag nach, ob Teilzeit möglich ist."]);
+    Object.keys(ENV_LABEL).forEach(function(k){ if(job.env[k] && excluded(ob,ENV_LABEL[k])) chk.push([ENV_LABEL[k]+" — dein Ausschlusskriterium","Du hast das als kritisch markiert. Das heißt nicht „nein“ — aber im Gespräch klären."]); });
+    if(/tag/i.test(job.deadline)) chk.push(["Frist läuft: "+job.deadline,"Wenn du dich bewerben willst, plane die Unterlagen rechtzeitig ein."]);
+    if(!pro.length) pro.push(["Grundsätzlich anschlussfähig","Inhaltlich passt die Stelle zu deinem Profil."]);
+    if(!chk.length) chk.push(["Wenig Offenes erkennbar","Aus dem Text ergeben sich kaum Klärungspunkte — prüf die Details selbst gegen."]);
+    return {pro:pro.slice(0,3), chk:chk.slice(0,3)};
+  }
+
+  function buildScore(job,ob){
+    var fach=82;
+    var zeit = (job.hoursNum && ob.hoursMaxNum) ? (job.hoursNum<=ob.hoursMaxNum?88:46)
+      : job.teil?82 : /oder|nicht genannt/i.test(job.hoursStr)?60 : (job.voll && ob.hoursMaxNum && ob.hoursMaxNum<40?46:72);
+    var weg = job.remote?95 : (/nicht genannt/.test(job.loc)?68:84);
+    var umfeld = envHitAny(job,ob)?52 : (Object.keys(job.env).some(function(k){return job.env[k];})?70:82);
+    var level=80;
+    var bars=[["Fachliche Passung",fach],["Arbeitszeit",zeit],["Arbeitsweg",weg],["Arbeitsumfeld",umfeld],["Erfahrungslevel",level]];
+    var overall=Math.round(fach*0.34+zeit*0.22+weg*0.16+umfeld*0.14+level*0.14);
+    return {bars:bars, overall:overall};
+  }
+
+  function reasonHTML(arr,kind){
+    return arr.map(function(r,i){
+      return '<div class="reason '+kind+'" style="animation-delay:'+(0.05+i*0.1).toFixed(2)+'s"><span class="mk">'+(kind==="pro"?"✓":"?")+'</span><div><div class="rt">'+esc(r[0])+'</div><div class="rd">'+esc(r[1])+'</div></div></div>';
+    }).join("");
+  }
+
+  // the whole point: paste -> one click -> filled summary + reasons + score, no manual entry
+  function runOwnAnalysis(descText, titleVal){
+    descText=(descText||"").trim(); titleVal=(titleVal||"").trim();
+    var scan=[titleVal, descText].filter(Boolean).join("\n\n"); // parse from whatever the user gave us
+    var bodyText=descText || titleVal;                          // what to show in the job panel
+    var job=parseJob(scan, titleVal), ob=readOnboarding(), R=buildReasons(job,ob), S=buildScore(job,ob);
+    var zeitFlag=/oder|nicht genannt/i.test(job.hoursStr), envHit=envHitAny(job,ob);
+    var coLine=esc(job.loc)+(/(tag|bis)/i.test(job.deadline)?(" · Frist "+esc(job.deadline)):"");
+
+    var sh=document.querySelector("#s-summary .job-head");
+    if(sh) sh.innerHTML='<div class="src">'+esc(job.emp)+' · '+esc(job.loc)+'</div><h3>'+esc(job.title)+'</h3><div class="co">'+esc(job.loc)+'</div>';
+    var sg=document.querySelector("#s-summary .summary");
+    if(sg){
+      var envTxt=Object.keys(ENV_LABEL).filter(function(k){return job.env[k];}).map(function(k){return ENV_LABEL[k];}).join(", ")||"keine Auffälligkeiten";
+      sg.innerHTML = kv("Rolle",job.title)+kv("Quelle",job.emp)+kv("Arbeitszeit"+(zeitFlag?" ⚑":""),job.hoursStr,zeitFlag)
+        +kv("Arbeitsort",job.loc)+kv("Arbeitsumfeld"+(envHit?" ⚑":""),envTxt,envHit)+kv("Frist",job.deadline);
+    }
+    var fh=document.querySelector("#s-fit .panel-job .job-head");
+    if(fh) fh.innerHTML='<div class="src">'+esc(job.emp)+'</div><h3>'+esc(job.title)+'</h3><div class="co">'+coLine+'</div>';
+    var fb=document.querySelector("#s-fit .job-body");
+    if(fb){
+      var paras=bodyText.split(/\n{2,}/).map(function(p){return p.trim();}).filter(Boolean); if(!paras.length) paras=[bodyText];
+      fb.innerHTML='<h4>Eingefügte Stelle</h4>'+paras.map(function(){return '<p style="white-space:pre-wrap;margin-bottom:8px"></p>';}).join("");
+      var ps=fb.querySelectorAll("p"); paras.forEach(function(tx,i){ ps[i].textContent=tx; });
+    }
+
+    var verdict = S.overall>=70?"◆ Bewerben lohnt sich":S.overall>=52?"◆ Genauer ansehen":"◆ Eher kritisch";
+    var ar=document.querySelector("#arm-reasoning .core");
+    if(ar) ar.innerHTML=
+      '<div class="assess-head"><h2 class="serif">Meine Einschätzung</h2><span class="verdict go">'+verdict+'</span></div>'+
+      '<p class="muted small">Begründet, kein Punktwert. Du behältst die Entscheidung.</p>'+
+      '<div class="block-title">Was dafür spricht <span class="cnt">'+R.pro.length+'</span></div>'+
+      '<div class="reasons">'+reasonHTML(R.pro,"pro")+'</div>'+
+      '<div class="block-title warn" style="margin-top:24px">Was du vorher klären solltest <span class="cnt">'+R.chk.length+'</span></div>'+
+      '<div class="reasons">'+reasonHTML(R.chk,"check")+'</div>'+
+      '<div class="qual"><h4>Über- oder unterqualifiziert?</h4><p>Aus dem Text lässt sich das nicht hart ableiten. Stell deine relevante Erfahrung im Anschreiben kurz neben die genannten Anforderungen — so zeigst du Passung, ohne dich zu klein zu machen.</p></div>'+
+      '<div class="next-bar"><span class="nx">Nächster sinnvoller Schritt: <b>'+esc(R.chk[0][0])+'</b></span><button class="btn btn-teal" data-go="s-decision">Entscheiden <span class="ic" aria-hidden="true">→</span></button></div>';
+
+    var asc=document.querySelector("#arm-score .core");
+    if(asc) asc.innerHTML=
+      '<div class="assess-head"><h2>Passungs-Score</h2><span class="verdict go">'+(S.overall>=70?"Gute Passung":S.overall>=52?"Mittlere Passung":"Eher kritisch")+'</span></div>'+
+      '<div class="scorewrap"><div class="gauge" style="--p:'+S.overall+'"><div class="num">'+S.overall+'<span>%</span></div></div><div class="gauge-cap">Gesamt-Passung für diese Stelle</div></div>'+
+      '<div class="score-sub" id="scoreBars">'+S.bars.map(function(b){return '<div class="sbar"><span class="lab">'+esc(b[0])+'</span><span class="track"><span class="fill" data-w="'+b[1]+'"></span></span><span class="pct">'+b[1]+'%</span></div>';}).join("")+'</div>'+
+      '<p class="score-note">Gesamt-Score aus 5 Kriterien · gewichtet</p>'+
+      '<div class="next-bar"><span class="nx">Empfehlung: <b>'+(S.overall>=52?"Bewerben":"Genau prüfen")+'</b></span><button class="btn btn-teal" data-go="s-decision">Entscheiden <span class="ic" aria-hidden="true">→</span></button></div>';
+    scoreBarsTriggered=false; // let the freshly generated bars animate when the score arm shows
+  }
+
   function setOwn(on){
     if(on === ownOn) return;
     ownOn = on;
     document.getElementById("ownToggle").classList.toggle("on", on);
     document.getElementById("ownToggle").setAttribute("aria-checked", on);
     document.getElementById("ownHint").textContent = on
-      ? "An: Felder leer — echte Stelle der Testperson eintragen."
-      : "Aus = Beispielstelle. An = Felder leer für echte Stelle.";
-    document.body.classList.toggle("own", on);
-    if(on){
-      ownTextField("#s-summary .job-head h3", "[ Titel der echten Stelle ]");
-      ownTextField("#s-summary .job-head .src", "[ Quelle / Arbeitgeber ]");
-      ownTextField("#s-summary .summary .kv .v", "[ … ]");
-      ownTextField("#s-fit .job-head h3", "[ Titel der echten Stelle ]");
-      ownTextField("#s-fit .job-head .src", "[ Arbeitgeber ]");
-      ownTextField("#s-fit .job-head .co", "[ Ort · Frist ]");
-      ownTextField("#arm-reasoning .reason .rt", "[ Stichpunkt — hier eintragen ]");
-      ownTextField("#arm-reasoning .reason .rd", "[ Begründung mit der Testperson formulieren ]");
-      ownTextField("#arm-reasoning .qual p", "[ Einordnung Über-/Unterqualifikation — hier eintragen ]");
-      jobBody = document.querySelector("#s-fit .job-body");
-      if(jobBody){
-        jobBodyOrig = jobBody.innerHTML;
-        jobBody.setAttribute("contenteditable","true");
-        jobBody.setAttribute("data-own-edit","");
-        jobBody.innerHTML = '<h4>Stellentext</h4><p>[ Stellenanzeige der Testperson hier einfügen — Aufgaben, Anforderungen, Rahmen. ]</p>';
-      }
-    } else {
-      ownText.forEach(function(o){ o.el.textContent = o.orig; o.el.removeAttribute("contenteditable"); o.el.removeAttribute("data-own-edit"); });
-      ownText = [];
-      if(jobBody && jobBodyOrig != null){ jobBody.innerHTML = jobBodyOrig; jobBody.removeAttribute("contenteditable"); jobBody.removeAttribute("data-own-edit"); jobBody = null; jobBodyOrig = null; }
-    }
+      ? "An: Jobtitel + Beschreibung einfügen → „Stelle analysieren“ erzeugt Zusammenfassung, Gründe und Score automatisch."
+      : "Aus = Beispielstelle. An = eigene Stelle einfügen und automatisch analysieren.";
+    if(on){ urlInputEl.value = ""; titleInputEl.value = ""; textInputEl.value = ""; snapshotRegions(); }
+    else  { urlInputEl.value = urlOrig; titleInputEl.value = titleOrig; textInputEl.value = textOrig; restoreRegions(); }
   }
   document.getElementById("ownToggle").addEventListener("click", function(){ setOwn(!ownOn); });
 
   updateStepper(0);
+  updateBackBar();
+  history.replaceState({screen:"s-welcome"}, "");
+  history.pushState({screen:"s-welcome"}, ""); // buffer so the first browser Back is captured, not a page-leave
 })();
 </script>
 </body>
